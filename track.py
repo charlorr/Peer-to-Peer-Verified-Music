@@ -9,7 +9,7 @@ import constant
 class Track:
 
     @staticmethod
-    def track_from_file(file_name: str):
+    def from_file(file_name: str):
         '''
         Construct a Track object from a file.
         '''
@@ -33,7 +33,7 @@ class Track:
         return Track(title, artist, duration, file_hash, fingerprint, local=True)
 
     @staticmethod
-    def track_from_json(json_str: str):
+    def from_json(json_str: str):
         '''
         Construct a Track object from JSON.
         '''

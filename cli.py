@@ -96,7 +96,7 @@ class CLI:
         for file in files:
             if (not os.path.isdir(file)):
                 self.log_window.print(f"Processing '{file}'...")
-                tracks.append(Track.track_from_file(file))
+                tracks.append(Track.from_file(file))
 
         self.update_available_tracks(tracks)
 
