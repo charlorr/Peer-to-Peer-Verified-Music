@@ -5,6 +5,7 @@ import time
 from typing import List
 
 import constant
+from peer import Peer
 from track import Track
 
 RED = 1
@@ -81,13 +82,14 @@ class CLI:
 
         # Side by side panels
         self.track_window = CursesBox(panel_h, cols // 2 - 1, 0, 1, 'Available Tracks:')
-        self.peer_window = CursesBox(panel_h, cols // 2, 0, cols // 2 + 1, 'Connected Peers:')
+        self.peer_window = CursesBox(panel_h, cols // 2, 0, cols // 2 + 1, 'Peers:')
 
         self.log_window = CursesBox(log_h, cols - 1, avail_lines - log_h, 1, 'Status:')
         self.command_window = CursesBox(3, cols - 1, lines - command_h, 1, scroll=False)
 
     def run(self):
 
+        # Load files
         self.log_window.print(f"Checking directory '{constant.FILE_PREFIX}' for media... ")
 
         # Only check 1 level deep
@@ -99,9 +101,19 @@ class CLI:
                 tracks.append(Track.from_file(file))
 
         self.update_available_tracks(tracks)
+        self.log_window.print('Done')
 
-        self.log_window.print(f'Done')
+        # Load peers
+        self.log_window.print('Loading saved peers from disk... ', end='')
+        peers = Peer.load_from_disk()
 
+        # TODO: Try to connect to each
+        # and set peer.connected based on success
+
+        self.update_connected_peers(peers)
+        self.log_window.print('Done')
+
+        # Run forever
         while True:
             res = self.command_window.input()
             self.log_window.print(res)
@@ -118,6 +130,19 @@ class CLI:
                 self.track_window.print(track, curses.color_pair(GREEN))
             else:
                 self.track_window.print(track)
+
+    def update_connected_peers(self, peer_list: List[Peer]):
+        '''
+        Update the list of peers.
+        '''
+
+        self.peer_window.clear()
+
+        for peer in peer_list:
+            if (peer.connected):
+                self.peer_window.print(peer, curses.color_pair(GREEN))
+            else:
+                self.peer_window.print(peer, curses.color_pair(RED))
 
     def __del__(self):
 

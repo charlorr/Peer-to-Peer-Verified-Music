@@ -4,7 +4,7 @@ from typing import List
 class Peer:
 
     @staticmethod
-    def save_to_disk(peers):
+    def dump_to_disk(peers):
         '''
         Write the given list of peers to the config file on disk.
         '''
@@ -21,7 +21,7 @@ class Peer:
             json.dump(final_peers_dict, f, indent=2)
 
     @staticmethod
-    def read_from_disk():
+    def load_from_disk():
         '''
         Generate a List of Peers from the config file on disk.
         '''
@@ -35,10 +35,11 @@ class Peer:
 
         return peers
 
-    def __init__(self, host, port):
+    def __init__(self, host, port, connected=False):
 
         self.host = host
         self.port = int(port)
+        self.connected = connected
 
     def to_json(self):
         '''
@@ -64,11 +65,11 @@ if (__name__ == '__main__'):
     for peer in peers:
         print(peer)
 
-    Peer.save_to_disk(peers)
+    Peer.dump_to_disk(peers)
 
     print()
 
-    peers2 = Peer.read_from_disk()
+    peers2 = Peer.load_from_disk()
 
     for peer in peers2:
         print(peer)
