@@ -115,7 +115,7 @@ class CLI:
 
         for track in track_list:
             if (track.local):
-                self.track_window.print(track.title, curses.color_pair(GREEN))
+                self.track_window.print(track, curses.color_pair(GREEN))
             else:
                 self.track_window.print(track)
 

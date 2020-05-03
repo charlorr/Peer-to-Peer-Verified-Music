@@ -57,6 +57,10 @@ class Track:
 
         return json.dumps(json_dict)
 
+    def __str__(self):
+
+        return f'{self.title} -- {self.artist}'
+
 def hash_file(path: str) -> str:
     '''
     Calculate and return the SHA-256 hash of the given file.
