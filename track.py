@@ -10,6 +10,9 @@ class Track:
 
     @staticmethod
     def track_from_file(file_name: str):
+        '''
+        Construct a Track object from a file.
+        '''
 
         path = os.path.join(constant.FILE_PREFIX, file_name)
 
@@ -28,6 +31,22 @@ class Track:
             artist = 'Unknown'
 
         return Track(title, artist, duration, file_hash, fingerprint, local=True)
+
+    @staticmethod
+    def track_from_json(json_str: str):
+        '''
+        Construct a Track object from JSON.
+        '''
+
+        json_dict = json.loads(json_str)
+
+        duration = json_dict['duration']
+        fingerprint = json_dict['fingerprint']
+        file_hash = json_dict['hash']
+        title = json_dict['title']
+        artist = json_dict['artist']
+
+        return Track(title, artist, duration, file_hash, fingerprint, local=False)
 
     def __init__(self,
         title: str,
