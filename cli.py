@@ -34,8 +34,11 @@ class CursesBox:
         self.inner.refresh()
 
     def input(self, max_chars=constant.MAX_CHARS):
+
+        self.inner.addstr('>')
+
         curses.echo()
-        res = self.inner.getstr(0, 0, max_chars).decode('UTF-8')
+        res = self.inner.getstr(0, 2, max_chars).decode('UTF-8')
         curses.noecho()
         self.inner.clear()
 
