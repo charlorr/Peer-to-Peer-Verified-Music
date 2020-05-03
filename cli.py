@@ -1,8 +1,11 @@
 import curses
 import math
+import os
 import time
+from typing import List
 
 import constant
+from track import Track
 
 RED = 1
 GREEN = 2
@@ -31,8 +34,8 @@ class CursesBox:
         self.inner.scrollok(scroll)
         self.inner.refresh()
 
-    def print(self, msg='', end='\n'):
-        self.inner.addstr(f'{end}{msg}')
+    def print(self, msg='', attrs=curses.A_NORMAL, end='\n'):
+        self.inner.addstr(f'{msg}{end}', attrs)
         self.inner.refresh()
 
     def input(self, max_chars=constant.MAX_CHARS):
@@ -45,6 +48,10 @@ class CursesBox:
         self.inner.clear()
 
         return res
+
+    def clear(self):
+
+        self.inner.clear()
 
     def refresh(self):
         self.container.refresh()
@@ -81,9 +88,36 @@ class CLI:
 
     def run(self):
 
+        self.log_window.print(f"Checking directory '{constant.FILE_PREFIX}' for media... ")
+
+        # Only check 1 level deep
+        tracks = []
+        files = os.listdir(constant.FILE_PREFIX)
+        for file in files:
+            if (not os.path.isdir(file)):
+                self.log_window.print(f"Processing '{file}'...")
+                tracks.append(Track.track_from_file(file))
+
+        self.update_available_tracks(tracks)
+
+        self.log_window.print(f'Done')
+
         while True:
             res = self.command_window.input()
             self.log_window.print(res)
+
+    def update_available_tracks(self, track_list: List[Track]):
+        '''
+        Update the list of available tracks.
+        '''
+
+        self.track_window.clear()
+
+        for track in track_list:
+            if (track.local):
+                self.track_window.print(track.title, curses.color_pair(GREEN))
+            else:
+                self.track_window.print(track)
 
     def __del__(self):
 
