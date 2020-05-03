@@ -8,4 +8,4 @@ with open('secrets.json', 'r') as f:
 PROG_NAME = 'Peer-to-Peer Verified Music'
 API_KEY = secrets["API_KEY"]
 FILE_PREFIX = 'content'
-MAX_CHARS = 30
+MAX_CHARS = 100
