@@ -1,22 +1,45 @@
 #!/usr/bin/env python3
 
-import constant
-import acoustid
+import pprint
 import sys
 
+import acoustid as aid
+
+import constant
 
 def verify():
 
-    path = 'content/c.mp3'
+    path = f'{constant.FILE_PREFIX}/c.mp3'
 
-    for score, recording_id, title, artist in acoustid.match(constant.API_KEY, path):
-        x = 4
-        print(f"hello")
-        print(f"The song title is {title}")
+    duration, fingerprint = aid.fingerprint_file(path)
 
+    print(f'File:        {path}')
+    print(f'Duration:    {duration} s')
+    print(f'Fingerprint: {repr(fingerprint[:16])}...')
+    print()
 
-if __name__ == "__main__":
-    # execute only if run as a script
+    print('Manual fingerprint matches:')
+    print('-----------------------------')
+    json_resp = aid.lookup(constant.API_KEY, fingerprint, duration)
+    matches = aid.parse_lookup_result(json_resp)
+    print_matches(matches)
+
+    print('Auto fingerprint matches:')
+    print('-----------------------------')
+    print_matches(aid.match(constant.API_KEY, path))
+
+def print_matches(match_result, limit=3):
+
+    i = 0
+    for score, recording_id, title, artist in match_result:
+        print(f'ID:      {recording_id}')
+        print(f'Title:   {title}')
+        print(f'Artist:  {artist}')
+        print()
+
+        i += 1
+        if (i >= limit):
+            break
+
+if (__name__ == '__main__'):
     verify()
-
-
