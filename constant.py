@@ -10,3 +10,4 @@ API_KEY = secrets["API_KEY"]
 FILE_PREFIX = 'content'
 MAX_CHARS = 100
 HASH_LEN = 4
+MAX_SOCK_READ = 4096

@@ -1,16 +1,23 @@
 #!/usr/bin/env python3
 
+import base64
+import json
+import os.path
 import socket
 import sys
 import threading
+import traceback
 
+import constant
 from peer import Peer
 
 class Server:
-    def __init__(self, cli, port):
+    def __init__(self, cli, port, tracks, local_tracks):
         self.host = '0.0.0.0' # Listen on all interfaces
         self.port = port
         self.log = cli.log_window
+        self.tracks = tracks
+        self.local_tracks = local_tracks
         self.nodes = {}
 
     def start(self):
@@ -33,31 +40,101 @@ class Server:
             self.sock.listen()
             conn, addr = self.sock.accept()
             self.nodes[addr] = conn
-            thread = ClientThread(self.log, addr, conn)
+            thread = ClientThread(self.log, addr, conn, self.tracks, self.local_tracks)
             thread.start()
 
 class ClientThread(threading.Thread):
-    def __init__(self, log, addr, conn):
+    def __init__(self, log, addr, conn, tracks, local_tracks):
         threading.Thread.__init__(self)
         self.log = log
         self.conn = conn
+        self.tracks = tracks
+        self.local_tracks = local_tracks
         self.peer = Peer(*addr)
 
         self.log.print(f'Got connection from {self.peer}')
+
+    def read_file(self, path):
+        '''
+        Read the entire file into memory and encode to
+        base64.
+        '''
+
+        with open(os.path.join(constant.FILE_PREFIX, path), 'rb') as f:
+            data = f.read()
+
+        return base64.b64encode(data)
 
     def run(self):
 
         while True:
             try:
-                data = self.conn.recv(4096).decode("utf-8")
-                data = f'pong'
-                self.conn.sendall(data.encode())
+                data = self.conn.recv(constant.MAX_SOCK_READ).decode()
+
+                if (len(data) == 0):
+                    self.conn.close()
+                    self.log.print(f'Connection to {self.peer} closed')
+                    break
+
+                self.log.print(data)
+
+                str_resp = None
+
+                if (data == 'ping'):
+                    str_resp = 'pong'
+
+                else:
+                    str_resp = self.handle_json_req(data)
+                    if (str_resp is None):
+                        continue
+
+                self.log.print(str_resp)
+
+                self.conn.sendall(str_resp.encode())
+
             except socket.timeout:
                 self.conn.close()
                 self.log.print(f'Connection to {self.peer} closed')
                 break
             except Exception:
-                self.log.print(f'Could not read from {self.peer} socket')
-                self.conn.close()
-                self.log.print(f'Closed connection to {self.peer}')
-                break
+                self.log.print(traceback.format_exc())
+                continue
+
+    def handle_json_req(self, data):
+
+        try:
+            json_req = json.loads(data)
+            action = json_req['action']
+        except:
+            self.log.print('JSON parse failed')
+            return None
+
+        if (action == 'get_track_list'):
+
+            json_resp = {
+                'action': 'put_track_list',
+                'tracks': [track.to_dict() for track in self.local_tracks.values()]
+            }
+
+        elif (action == 'get_track'):
+
+            track_hash = json_req['hash']
+
+            # Ignore requests for tracks we don't know
+            if (track_hash not in self.local_tracks):
+                return None
+
+            track = self.local_tracks[track_hash]
+
+            # Ignore requests for tracks we don't have
+            if (not track.local):
+                return None
+
+            file_data = self.read_file(track.path)
+
+            json_resp = {
+                'action': 'put_track',
+                'fileData': file_data
+            }
+
+        return json.dumps(json_resp)

@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 
+import base64
 import json
+import os.path
 import socket
 from typing import List
+
+import constant
+from track import Track, hash_file
 
 class Peer:
 
@@ -104,15 +109,64 @@ class Peer:
 
         if (not self.connected):
             self.log(f'Connection to {self} died')
+            self.disconnect()
 
         return self.connected
 
-    def send(self, data, is_str=True):
+    def request_track_list(self):
+        '''
+        Fetch the list of available tracks.
+        '''
+
+        self.log(f'Requesting track list for {self}...')
+
+        self.send({'action': 'get_track_list'}, is_json=True)
+        json_dict = self.recv(to_json=True)
+
+        tracks = []
+        for track_dict in json_dict['tracks']:
+
+            track = Track.from_dict(track_dict, self)
+            self.log(f"Found track '{track.title}'")
+
+            tracks.append(track)
+
+        return tracks
+
+    def request_track(self, track):
+
+        self.log(f"Requesting '{track}'...")
+
+        self.send({'action': 'get_track', 'hash': track.hash}, is_json=True)
+        json_dict = self.recv(to_json=True)
+        b64_data = json_dict['fileData']
+
+        file_path = os.path.join(constant.FILE_PREFIX, track.hash)
+        file_data = base64.b64decode(b64_data)
+
+        with open(file_path, 'wb') as f:
+            f.write(file_data)
+
+        final_hash = hash_file(file_path)
+
+        if (track.hash != final_hash):
+            self.log('Track hashes did not match! File may have been corrupted')
+
+        # Mark the file as local
+        track.local = True
+        track.path = track.hash
+
+        return True
+
+    def send(self, data, is_str=True, is_json=False):
         '''
         Send data.
         '''
 
-        if (is_str):
+        if (is_json):
+            data = json.dumps(data)
+
+        if (is_str or is_json):
             data = data.encode()
 
         try:
@@ -124,7 +178,7 @@ class Peer:
 
         return True
 
-    def recv(self, timeout=3, size=1024, to_str=True):
+    def recv(self, timeout=5, size=constant.MAX_SOCK_READ, to_str=True, to_json=False):
         '''
         Read from the socket. Returns `None` if response does
         not arrive before `timeout`.
@@ -133,12 +187,16 @@ class Peer:
         self.tcp_conn.settimeout(timeout)
 
         try:
-            resp = self.tcp_conn.recv(1024)
+            resp = self.tcp_conn.recv(size)
         except socket.timeout:
+            self.log('Request timed out')
             return None
 
-        if (to_str):
+        if (to_str or to_json):
             resp = resp.decode()
+
+        if (to_json):
+            resp = json.loads(resp)
 
         return resp
 
@@ -147,6 +205,7 @@ class Peer:
         if (self.tcp_conn):
             self.tcp_conn.close()
 
+        self.tcp_conn = None
         self.connected = False
 
         self.log(f'Disconnected from {self}')

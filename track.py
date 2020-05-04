@@ -33,12 +33,20 @@ class Track:
         return Track(title, artist, duration, file_hash, fingerprint, path=file_name, local=True)
 
     @staticmethod
-    def from_json(json_str: str):
+    def from_json(json_str: str, peer):
         '''
         Construct a Track object from JSON.
         '''
 
         json_dict = json.loads(json_str)
+
+        return from_dict(json_dict, peer)
+
+    @staticmethod
+    def from_dict(json_dict: dict, peer):
+        '''
+        Construct a Track object from a JSON dictionary.
+        '''
 
         duration = json_dict['duration']
         fingerprint = json_dict['fingerprint']
@@ -46,7 +54,7 @@ class Track:
         title = json_dict['title']
         artist = json_dict['artist']
 
-        return Track(title, artist, duration, file_hash, fingerprint, path=None, local=False)
+        return Track(title, artist, duration, file_hash, fingerprint, peer=peer, local=False)
 
     def __init__(self,
         title: str,
@@ -54,6 +62,8 @@ class Track:
         duration_s: float,
         file_hash: str,
         fingerprint: bytes,
+        path: str = None,
+        peer = None,
         local: bool = False
     ):
 
@@ -63,23 +73,50 @@ class Track:
         self.hash = file_hash
         self.fingerprint = fingerprint
         self.path = path
+        self.peer = peer
         self.local = local
 
-    def to_json(self):
+        print(peer)
+
+    def download(self, log):
+        '''
+        Request the track from its peer.
+        '''
+
+        if (self.local):
+            log.print(f'Track {self.short_hash()} is already local')
+            return
+
+        if (self.peer is None):
+            log.print('Download failed: Track has no peer')
+            return
+
+        success = self.peer.request_track(self)
+        return success
+
+    def to_dict(self):
 
         json_dict = {
             'title': self.title,
             'artist': self.artist,
             'duration': self.duration,
             'hash': self.hash,
-            'fingerprint': self.fingerprint
+            'fingerprint': '' # self.fingerprint # Trouble sending this because it's bytes
         }
 
-        return json.dumps(json_dict)
+        return json_dict
+
+    def to_json(self):
+
+        return json.dumps(self.to_dict())
+
+    def short_hash(self):
+
+        return self.hash[:constant.HASH_LEN]
 
     def __str__(self):
 
-        return f'[{self.hash[:constant.HASH_LEN]}] {self.title} -- {self.artist}'
+        return f'[{self.short_hash()}] {self.title} -- {self.artist}'
 
 def hash_file(path: str) -> str:
     '''
