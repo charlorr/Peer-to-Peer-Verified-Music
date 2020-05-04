@@ -1,12 +1,16 @@
 import curses
 import math
 import os
+import sys
 import time
 from typing import List
 
 import constant
 from peer import Peer
 from track import Track
+
+from client import Client, Connection
+from server import Server
 
 RED = 1
 GREEN = 2
@@ -103,6 +107,18 @@ class CLI:
         self.update_available_tracks(tracks)
         self.log_window.print('Done')
 
+         # Check if port number is specified
+        if len(sys.argv) < 2:
+            print('usage: ./cli.py [port]')
+            sys.exit()
+
+        # Start a server object to handle receiving connections/requests
+        server = Server(self, int(sys.argv[1]))
+        server.start()
+
+        # Start a client object to handle commands from the user
+        client = Client(self)
+
         # Load peers
         self.log_window.print('Loading saved peers from disk... ', end='')
         peers = Peer.load_from_disk()
@@ -116,7 +132,9 @@ class CLI:
         # Run forever
         while True:
             res = self.command_window.input()
-            self.log_window.print(res)
+            # self.log_window.print(f'second, res is {res}')
+            client.handle_commands(res)
+            client.print_connected_peers()
 
     def update_available_tracks(self, track_list: List[Track]):
         '''
