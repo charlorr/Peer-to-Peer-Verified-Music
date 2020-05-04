@@ -113,6 +113,7 @@ class CLI:
 
         # Start a client object to handle commands from the user
         self.client = Client(self)
+        self.client.should_update = False
 
         self.client.add_local_tracks()
         self.log()
@@ -124,6 +125,9 @@ class CLI:
 
         self.client.restore_peers()
         self.log()
+
+        self.client.should_update = True
+        self.client.update()
 
         # Run forever
         while True:
@@ -164,6 +168,8 @@ class CLI:
                 self.peer_window.print(peer, curses.color_pair(CLI.RED))
 
     def cleanup(self):
+
+        # return
 
         self.display.keypad(False)
         curses.nocbreak()

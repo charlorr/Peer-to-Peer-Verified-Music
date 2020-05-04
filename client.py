@@ -19,6 +19,8 @@ class Client:
         self.all_tracks_sh = {} # Short hash
         self.local_tracks = {}
 
+        self.should_update = True
+
         # Make sure the connection list gets stored to disk
         atexit.register(lambda: Peer.dump_to_disk(self.connections.values()))
 
@@ -50,6 +52,8 @@ class Client:
             if (track.local):
                 self.local_tracks[track.hash] = track
 
+        self.update_tracks()
+
     def add_local_tracks(self):
         '''
         Scan the content folder and add local tracks.
@@ -74,7 +78,6 @@ class Client:
 
         self.add_tracks(tracks)
 
-        self.update_tracks()
         self.cli.log('Done')
 
     def do_track_list_update(self):
@@ -107,7 +110,6 @@ class Client:
         for peer in peers:
             self.peer_manipulate(peer, 'add')
 
-        self.update_peers()
         self.cli.log('Done')
 
     def peer_manipulate(self, peer, method):
@@ -140,14 +142,24 @@ class Client:
                 peer.connect()
                 self.connections[peer] = peer
 
+                # Get the new tracks
+                tracks = peer.request_track_list()
+                if (tracks is not None):
+                    self.add_tracks(tracks)
+
         self.update_peers()
-        self.do_track_list_update()
+
+    def update(self):
+        self.update_tracks()
+        self.update_peers()
 
     def update_tracks(self):
-        self.cli.update_available_tracks(self.all_tracks.values())
+        if (self.should_update):
+            self.cli.update_available_tracks(self.all_tracks.values())
 
     def update_peers(self):
-        self.cli.update_connected_peers(self.connections.values())
+        if (self.should_update):
+            self.cli.update_connected_peers(self.connections.values())
 
     def handle_commands(self, command):
 
