@@ -1,9 +1,8 @@
 #!/bin/bash
 
 export NCURSES_NO_UTF8_ACS=1
-sudo apt install ffmpeg
+sudo apt install -y ffmpeg libchromaprint-dev
 
+pip3 install -r requirements.txt
 
-sudo apt install libchromaprint-dev
-
-pip3 install pyacoustid
+python ./cli.py 9090
