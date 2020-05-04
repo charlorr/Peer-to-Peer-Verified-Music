@@ -76,19 +76,17 @@ class Track:
         self.peer = peer
         self.local = local
 
-        print(peer)
-
-    def download(self, log):
+    def download(self, cli):
         '''
         Request the track from its peer.
         '''
 
         if (self.local):
-            log.print(f'Track {self.short_hash()} is already local')
+            self.cli.log(f'Track {self.short_hash()} is already local')
             return
 
         if (self.peer is None):
-            log.print('Download failed: Track has no peer')
+            self.cli.log('Download failed: Track has no peer')
             return
 
         success = self.peer.request_track(self)

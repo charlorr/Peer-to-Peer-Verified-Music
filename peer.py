@@ -29,7 +29,7 @@ class Peer:
             json.dump(final_peers_dict, f, indent=2)
 
     @staticmethod
-    def load_from_disk():
+    def load_from_disk(cli):
         '''
         Generate a List of Peers from the config file on disk.
         '''
@@ -39,38 +39,17 @@ class Peer:
 
         peers = []
         for peer_info in json_dict['peers']:
-            peers.append(Peer(peer_info['host'], peer_info['port']))
+            peers.append(Peer(cli, peer_info['host'], peer_info['port']))
 
         return peers
 
-    @staticmethod
-    def from_list(tuples):
-        '''
-        Take list of tuple(host, port) and turn it into a list of Peers
-        '''
-
-        peers = []
-        for host, port in tuples:
-            peers.append(Peer(host, port))
-
-        return peers
-
-    def __init__(self, host, port, connected=False, log=None):
+    def __init__(self, cli, host, port, connected=False):
 
         self.host = host
         self.port = int(port)
         self.connected = connected
         self.tcp_conn = None
-        self.log_window = log
-
-    def log(self, msg):
-
-        if (self.log_window):
-            self.log_window.print(msg)
-
-    def set_log(self, log):
-
-        self.log_window = log
+        self.cli = cli
 
     def connect(self):
 
@@ -82,10 +61,10 @@ class Peer:
             # Establish connection to TCP server and exchange data
             self.tcp_conn.connect(self.to_tuple())
             self.connected = True
-            self.log(f'Connected to {self}')
+            self.cli.log(f'Connected to {self}')
         except ConnectionRefusedError:
             self.connected = False
-            self.log(f'Connection to {self} failed')
+            self.cli.log(f'Connection to {self} failed')
             return False
 
         return True
@@ -108,7 +87,7 @@ class Peer:
         self.connected = (resp == 'pong')
 
         if (not self.connected):
-            self.log(f'Connection to {self} died')
+            self.cli.log(f'Connection to {self} died')
             self.disconnect()
 
         return self.connected
@@ -118,16 +97,20 @@ class Peer:
         Fetch the list of available tracks.
         '''
 
-        self.log(f'Requesting track list for {self}...')
+        self.cli.log(f'Requesting track list for {self}...')
 
         self.send({'action': 'get_track_list'}, is_json=True)
         json_dict = self.recv(to_json=True)
+
+        if (json_dict is None):
+            self.cli.log('Request failed')
+            return None
 
         tracks = []
         for track_dict in json_dict['tracks']:
 
             track = Track.from_dict(track_dict, self)
-            self.log(f"Found track '{track.title}'")
+            self.cli.log(f"Found track '{track.title}'")
 
             tracks.append(track)
 
@@ -135,10 +118,15 @@ class Peer:
 
     def request_track(self, track):
 
-        self.log(f"Requesting '{track}'...")
+        self.cli.log(f"Requesting '{track}'...")
 
         self.send({'action': 'get_track', 'hash': track.hash}, is_json=True)
         json_dict = self.recv(to_json=True)
+
+        if (json_dict is None):
+            self.cli.log('Request failed')
+            return False
+
         b64_data = json_dict['fileData']
 
         file_path = os.path.join(constant.FILE_PREFIX, track.hash)
@@ -150,7 +138,7 @@ class Peer:
         final_hash = hash_file(file_path)
 
         if (track.hash != final_hash):
-            self.log('Track hashes did not match! File may have been corrupted')
+            self.cli.log('Track hashes did not match! File may have been corrupted')
 
         # Mark the file as local
         track.local = True
@@ -171,9 +159,9 @@ class Peer:
 
         try:
             self.tcp_conn.sendall(data)
-            self.log(f'Sent {len(data)} bytes to {self}')
+            self.cli.log(f'Sent {len(data)} bytes to {self}')
         except:
-            self.log('Failed to send data')
+            self.cli.log('Failed to send data')
             return False
 
         return True
@@ -189,7 +177,12 @@ class Peer:
         try:
             resp = self.tcp_conn.recv(size)
         except socket.timeout:
-            self.log('Request timed out')
+            self.cli.log('Request timed out')
+            return None
+
+        if (resp is None or len(resp) == 0):
+            self.cli.log(f'Connection to {self} closed')
+            self.disconnect()
             return None
 
         if (to_str or to_json):
@@ -208,7 +201,8 @@ class Peer:
         self.tcp_conn = None
         self.connected = False
 
-        self.log(f'Disconnected from {self}')
+        self.cli.log(f'Disconnected from {self}')
+        self.cli.client.update_peers()
 
     def __eq__(self, other):
 

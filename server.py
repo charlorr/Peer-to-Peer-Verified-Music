@@ -15,7 +15,7 @@ class Server:
     def __init__(self, cli, port, tracks, local_tracks):
         self.host = '0.0.0.0' # Listen on all interfaces
         self.port = port
-        self.log = cli.log_window
+        self.cli = cli
         self.tracks = tracks
         self.local_tracks = local_tracks
         self.nodes = {}
@@ -26,13 +26,13 @@ class Server:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind((self.host, self.port))
-        self.log.print(f'Starting server on port {self.port}... ', end='')
+        self.cli.log(f'Starting server on port {self.port}... ')
 
         thread = threading.Thread(target=self.run, args=())
         thread.daemon = True
         thread.start()
 
-        self.log.print(f'Done')
+        self.cli.log(f'Done')
 
     def run(self):
         while True:
@@ -40,19 +40,19 @@ class Server:
             self.sock.listen()
             conn, addr = self.sock.accept()
             self.nodes[addr] = conn
-            thread = ClientThread(self.log, addr, conn, self.tracks, self.local_tracks)
+            thread = ClientThread(self.cli, addr, conn, self.tracks, self.local_tracks)
             thread.start()
 
 class ClientThread(threading.Thread):
-    def __init__(self, log, addr, conn, tracks, local_tracks):
+    def __init__(self, cli, addr, conn, tracks, local_tracks):
         threading.Thread.__init__(self)
-        self.log = log
+        self.cli = cli
         self.conn = conn
         self.tracks = tracks
         self.local_tracks = local_tracks
-        self.peer = Peer(*addr)
+        self.peer = Peer(cli, *addr)
 
-        self.log.print(f'Got connection from {self.peer}')
+        self.cli.log(f'Got connection from {self.peer}')
 
     def read_file(self, path):
         '''
@@ -63,7 +63,7 @@ class ClientThread(threading.Thread):
         with open(os.path.join(constant.FILE_PREFIX, path), 'rb') as f:
             data = f.read()
 
-        return base64.b64encode(data)
+        return base64.b64encode(data).decode()
 
     def run(self):
 
@@ -73,10 +73,10 @@ class ClientThread(threading.Thread):
 
                 if (len(data) == 0):
                     self.conn.close()
-                    self.log.print(f'Connection to {self.peer} closed')
+                    self.cli.log(f'Connection to {self.peer} closed')
                     break
 
-                self.log.print(data)
+                self.cli.log(data)
 
                 str_resp = None
 
@@ -88,16 +88,16 @@ class ClientThread(threading.Thread):
                     if (str_resp is None):
                         continue
 
-                self.log.print(str_resp)
+                self.cli.log(str_resp)
 
                 self.conn.sendall(str_resp.encode())
 
             except socket.timeout:
                 self.conn.close()
-                self.log.print(f'Connection to {self.peer} closed')
+                self.cli.log(f'Connection to {self.peer} closed')
                 break
             except Exception:
-                self.log.print(traceback.format_exc())
+                self.cli.log(traceback.format_exc())
                 continue
 
     def handle_json_req(self, data):
@@ -106,7 +106,7 @@ class ClientThread(threading.Thread):
             json_req = json.loads(data)
             action = json_req['action']
         except:
-            self.log.print('JSON parse failed')
+            self.cli.log('JSON parse failed')
             return None
 
         if (action == 'get_track_list'):

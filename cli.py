@@ -5,18 +5,11 @@ import os
 import sys
 import time
 import traceback
-from typing import List
 
 import constant
-from peer import Peer
-from track import Track
 
 from client import Client
 from server import Server
-
-RED = 1
-GREEN = 2
-YELLOW = 3
 
 class CursesBox:
 
@@ -34,7 +27,7 @@ class CursesBox:
         self.container.box()
 
         if (title is not None):
-            self.container.addstr(0, 1, title, curses.A_BOLD + curses.color_pair(YELLOW))
+            self.container.addstr(0, 1, title, curses.A_BOLD + curses.color_pair(CLI.YELLOW))
 
         self.container.refresh()
 
@@ -67,7 +60,23 @@ class CursesBox:
 
 class CLI:
 
+    WHITE = 1
+    RED = 2
+    GREEN = 3
+    YELLOW = 4
+
+    __instance = None
+
+    @staticmethod
+    def get_instance():
+        if (CLI.__instance is None):
+            CLI()
+        return CLI.__instance
+
     def __init__(self):
+
+        if (not CLI.__instance is None):
+            raise Exception('CLI is a singleton')
 
         self.display = curses.initscr()
         self.display.clear()
@@ -76,9 +85,10 @@ class CLI:
         curses.cbreak()
 
         curses.start_color()
-        curses.init_pair(RED, curses.COLOR_RED, curses.COLOR_BLACK)
-        curses.init_pair(GREEN, curses.COLOR_GREEN, curses.COLOR_BLACK)
-        curses.init_pair(YELLOW, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+        curses.init_pair(CLI.WHITE, curses.COLOR_WHITE, curses.COLOR_BLACK)
+        curses.init_pair(CLI.RED, curses.COLOR_RED, curses.COLOR_BLACK)
+        curses.init_pair(CLI.GREEN, curses.COLOR_GREEN, curses.COLOR_BLACK)
+        curses.init_pair(CLI.YELLOW, curses.COLOR_YELLOW, curses.COLOR_BLACK)
 
         lines = curses.LINES
         cols = curses.COLS
@@ -97,57 +107,37 @@ class CLI:
 
         atexit.register(self.cleanup)
 
+        CLI.__instance = self
+
     def run(self, port):
 
         # Start a client object to handle commands from the user
-        client = Client(self)
+        self.client = Client(self)
 
-        # Load files
-        self.log_window.print(f"Checking directory '{constant.FILE_PREFIX}' for media... ")
-
-        # Only check 1 level deep
-        tracks = []
-        files = os.listdir(constant.FILE_PREFIX)
-        for file in files:
-            if (os.path.isfile(os.path.join(constant.FILE_PREFIX, file))):
-                self.log_window.print(f"Processing '{file}'...")
-                tracks.append(Track.from_file(file))
-
-        client.add_tracks(tracks)
-
-        self.log_window.print('Done')
-        self.log_window.print()
+        self.client.add_local_tracks()
+        self.log()
 
         # Start a server object to handle receiving connections/requests
-        server = Server(self, port, tracks=client.all_tracks, local_tracks=client.local_tracks)
-        server.start()
-        self.log_window.print()
+        self.server = Server(self, port, tracks=self.client.all_tracks, local_tracks=self.client.local_tracks)
+        self.server.start()
+        self.log()
 
-        # Load peers
-        self.log_window.print('Loading saved peers from disk... ')
-        peers = Peer.load_from_disk()
-
-        # Try to reconnect to each peer
-        for peer in peers:
-            peer.set_log(self.log_window)
-            client.peer_manipulate(peer, 'add')
-
-        self.update_connected_peers(peers)
-        self.log_window.print('Done')
-        self.log_window.print()
-
-        client.do_track_list_update()
-        self.log_window.print()
+        self.client.restore_peers()
+        self.log()
 
         # Run forever
         while True:
             try:
                 res = self.command_window.input()
-                client.handle_commands(res)
+                self.client.handle_commands(res)
             except Exception:
-                self.log_window.print(traceback.format_exc())
+                self.log(traceback.format_exc())
 
-    def update_available_tracks(self, track_list: List[Track]):
+    def log(self, msg='', color=WHITE, end='\n'):
+
+        self.log_window.print(msg, attrs=curses.color_pair(color), end=end)
+
+    def update_available_tracks(self, track_list):
         '''
         Update the list of available tracks.
         '''
@@ -156,11 +146,11 @@ class CLI:
 
         for track in track_list:
             if (track.local):
-                self.track_window.print(track, curses.color_pair(GREEN))
+                self.track_window.print(track, curses.color_pair(CLI.GREEN))
             else:
                 self.track_window.print(track)
 
-    def update_connected_peers(self, peer_list: List[Peer]):
+    def update_connected_peers(self, peer_list):
         '''
         Update the list of peers.
         '''
@@ -169,11 +159,13 @@ class CLI:
 
         for peer in peer_list:
             if (peer.connected):
-                self.peer_window.print(peer, curses.color_pair(GREEN))
+                self.peer_window.print(peer, curses.color_pair(CLI.GREEN))
             else:
-                self.peer_window.print(peer, curses.color_pair(RED))
+                self.peer_window.print(peer, curses.color_pair(CLI.RED))
 
     def cleanup(self):
+
+        # return
 
         self.display.keypad(False)
         curses.nocbreak()
@@ -194,5 +186,5 @@ if (__name__ == '__main__'):
     if (len(sys.argv) >= 3):
         constant.FILE_PREFIX = sys.argv[2]
 
-    cli = CLI()
+    cli = CLI.get_instance()
     cli.run(int(sys.argv[1]))

@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 
 import atexit
+import os
 import socket
 import sys
 
 import constant
 from peer import Peer
+from track import Track
 
 class Client:
 
     def __init__(self, cli):
         self.connections = {}
         self.cli = cli
-        self.log = cli.log_window
 
         self.all_tracks = {}
         self.all_tracks_sh = {} # Short hash
@@ -33,7 +34,7 @@ class Client:
             # Watch for hash collisions but don't chain for now
             if (short_hash in self.all_tracks_sh):
                 if (self.all_tracks_sh[short_hash].hash != track.hash):
-                    self.log.print('HASH COLLISION!!!')
+                    self.cli.log('HASH COLLISION!!!')
 
             # Don't overwrite the local track info that we have
             if (
@@ -49,13 +50,73 @@ class Client:
             if (track.local):
                 self.local_tracks[track.hash] = track
 
+    def add_local_tracks(self):
+        '''
+        Scan the content folder and add local tracks.
+
+        This only scans the top level folder. No subdirectories.
+        '''
+
+        # Create a bogus track to fix the issue
+        # where the screen clears itself
+        # This trigger the delayed import of CLI
+        t = Track('', '', 0, '', b'')
+
+        self.cli.log(f"Checking directory '{constant.FILE_PREFIX}' for media... ")
+
+        # Only check 1 level deep
+        tracks = []
+        files = os.listdir(constant.FILE_PREFIX)
+        for file in files:
+            if (os.path.isfile(os.path.join(constant.FILE_PREFIX, file))):
+                self.cli.log(f"Processing '{file}'...")
+                tracks.append(Track.from_file(file))
+
+        self.add_tracks(tracks)
+
+        self.cli.update_available_tracks(self.all_tracks.values())
+        self.cli.log('Done')
+
+    def do_track_list_update(self):
+        '''
+        Query all peers for an updated track list.
+        '''
+
+        for peer in self.connections.values():
+
+            if (peer.is_connected()):
+                tracks = peer.request_track_list()
+
+                if (tracks is None):
+                    continue
+
+                self.add_tracks(tracks)
+
+        self.cli.update_available_tracks(self.all_tracks.values())
+
+    def restore_peers(self):
+        '''
+        Restore and connect to each peer.
+        '''
+
+        # Load peers
+        self.cli.log('Loading saved peers from disk... ')
+        peers = Peer.load_from_disk(cli=self.cli)
+
+        # Try to reconnect to each peer
+        for peer in peers:
+            self.peer_manipulate(peer, 'add')
+
+        self.update_peers()
+        self.cli.log('Done')
+
     def peer_manipulate(self, peer, method):
         '''
         Add or remove peers.
         '''
 
         if (method == 'remove' and peer not in self.connections):
-            self.log.print(f'Invalid command: not connected to {peer}')
+            self.cli.log(f'Invalid command: not connected to {peer}')
 
         # The peer coming in could be a temporary peer to attempt look up the real Peer
         # The real Peer will actually have the TCP connection if one is open
@@ -73,44 +134,32 @@ class Client:
 
         elif (method == 'add'):
             if (peer.is_connected()):
-                self.log.print(f'Peer {peer} is already connected')
+                self.cli.log(f'Peer {peer} is already connected')
             else:
                 # Initiate client connection and add to connections list
                 peer.connect()
                 self.connections[peer] = peer
 
+        self.update_peers()
+        self.do_track_list_update()
+
+    def update_peers(self):
         self.cli.update_connected_peers(self.connections.values())
-
-    def do_track_list_update(self):
-        '''
-        Query all peers for an updated track list.
-        '''
-
-        self.log.print('Updating track list...')
-
-        for peer in self.connections.values():
-
-            if (peer.is_connected()):
-                tracks = peer.request_track_list()
-                self.add_tracks(tracks)
-
-        self.log.print('Done')
-        self.cli.update_available_tracks(self.all_tracks.values())
 
     def handle_commands(self, command):
 
         if (command in ['help', '?', '/?', 'h']):
-            self.log.print('\nAvailable commands:')
+            self.cli.log('\nAvailable commands:')
 
-            self.log.print('  peer add HOST:PORT')
-            self.log.print('  peer remove HOST:PORT')
+            self.cli.log('  peer add HOST:PORT')
+            self.cli.log('  peer remove HOST:PORT')
 
-            self.log.print('  track list')
-            self.log.print('  track get SHORT_HASH')
+            self.cli.log('  track list')
+            self.cli.log('  track get SHORT_HASH')
             return
 
         elif (command == 'exit' or command == 'quit'):
-            self.log.print('Exiting...')
+            self.cli.log('Exiting...')
 
             # Do some work to notify neighboring nodes that you're going down?
 
@@ -122,18 +171,18 @@ class Client:
 
         if (tokens[0] == 'peer'):
             if (len(tokens) < 3 or tokens[1] not in ['add', 'remove']):
-                self.log.print('usage: peer add|remove HOST:PORT')
+                self.cli.log('usage: peer add|remove HOST:PORT')
 
             else:
                 host, port = tokens[2].split(':')
-                peer = Peer(host, port, log=self.log)
+                peer = Peer(self.cli, host, port)
                 self.peer_manipulate(peer, tokens[1])
 
         elif (tokens[0] == 'track'):
             if (len(tokens) < 2 or tokens[1] not in ['list', 'get'] or (tokens[1] == 'get' and len(tokens) < 3)):
-                self.log.print('Usage:')
-                self.log.print('  track list')
-                self.log.print('  track get SHORT_HASH')
+                self.cli.log('Usage:')
+                self.cli.log('  track list')
+                self.cli.log('  track get SHORT_HASH')
 
             elif (tokens[1] == 'list'):
 
@@ -144,11 +193,11 @@ class Client:
                 short_hash = tokens[2]
 
                 if (len(short_hash) != constant.HASH_LEN):
-                    self.log.print(f'SHORT_HASH should be the {constant.HASH_LEN} character prefix to the left of the track')
+                    self.cli.log(f'SHORT_HASH should be the {constant.HASH_LEN} character prefix to the left of the track')
                     return
 
                 track = self.all_tracks_sh[short_hash]
-                track.download(log=self.log)
+                track.download(self.cli)
 
         else:
-            self.log.print('Invalid command. Type "help" for available commands')
+            self.cli.log('Invalid command. Type "help" for available commands')
