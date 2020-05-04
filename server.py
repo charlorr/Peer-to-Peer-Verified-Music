@@ -4,6 +4,8 @@ import socket
 import sys
 import threading
 
+from peer import Peer
+
 class Server:
     def __init__(self, cli, port):
         self.host = '0.0.0.0' # Listen on all interfaces
@@ -17,11 +19,13 @@ class Server:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind((self.host, self.port))
-        self.log.print(f'Listening on port {self.port}...')
+        self.log.print(f'Starting server on port {self.port}... ', end='')
 
         thread = threading.Thread(target=self.run, args=())
         thread.daemon = True
         thread.start()
+
+        self.log.print(f'Done')
 
     def run(self):
         while True:
@@ -37,22 +41,23 @@ class ClientThread(threading.Thread):
         threading.Thread.__init__(self)
         self.log = log
         self.conn = conn
-        self.addr = addr
+        self.peer = Peer(*addr)
 
-        self.log.print(f'Got connection from {self.addr}')
+        self.log.print(f'Got connection from {self.peer}')
 
     def run(self):
 
         while True:
             try:
                 data = self.conn.recv(4096).decode("utf-8")
-                data = f'Thanks for sending \"{data}\"'
+                data = f'pong'
                 self.conn.sendall(data.encode())
             except socket.timeout:
                 self.conn.close()
-                self.log.print(f'Connection at {self.addr} closed')
+                self.log.print(f'Connection to {self.peer} closed')
                 break
-            except Exception as e:
-                self.log.print(f'Could not read from client socket. Closing connection at {self.addr}...')
+            except Exception:
+                self.log.print(f'Could not read from {self.peer} socket')
                 self.conn.close()
+                self.log.print(f'Closed connection to {self.peer}')
                 break

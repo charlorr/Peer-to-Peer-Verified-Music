@@ -1,3 +1,4 @@
+import atexit
 import curses
 import math
 import os
@@ -9,7 +10,7 @@ import constant
 from peer import Peer
 from track import Track
 
-from client import Client, Connection
+from client import Client
 from server import Server
 
 RED = 1
@@ -91,7 +92,29 @@ class CLI:
         self.log_window = CursesBox(log_h, cols - 1, avail_lines - log_h, 1, 'Status:')
         self.command_window = CursesBox(3, cols - 1, lines - command_h, 1, scroll=False)
 
-    def run(self):
+        atexit.register(self.cleanup)
+
+    def run(self, port):
+
+        # Start a server object to handle receiving connections/requests
+        server = Server(self, port)
+        server.start()
+
+        # Start a client object to handle commands from the user
+        client = Client(self)
+
+        # Load peers
+        self.log_window.print('Loading saved peers from disk... ')
+        peers = Peer.load_from_disk()
+
+        # Try to reconnect to each peer
+        for peer in peers:
+            peer.set_log(self.log_window)
+            client.peer_manipulate(peer, 'add')
+
+        self.update_connected_peers(peers)
+        self.log_window.print('Done')
+        self.log_window.print()
 
         # Load files
         self.log_window.print(f"Checking directory '{constant.FILE_PREFIX}' for media... ")
@@ -106,35 +129,12 @@ class CLI:
 
         self.update_available_tracks(tracks)
         self.log_window.print('Done')
-
-         # Check if port number is specified
-        if len(sys.argv) < 2:
-            print('usage: ./cli.py [port]')
-            sys.exit()
-
-        # Start a server object to handle receiving connections/requests
-        server = Server(self, int(sys.argv[1]))
-        server.start()
-
-        # Start a client object to handle commands from the user
-        client = Client(self)
-
-        # Load peers
-        self.log_window.print('Loading saved peers from disk... ', end='')
-        peers = Peer.load_from_disk()
-
-        # TODO: Try to connect to each
-        # and set peer.connected based on success
-
-        self.update_connected_peers(peers)
-        self.log_window.print('Done')
+        self.log_window.print()
 
         # Run forever
         while True:
             res = self.command_window.input()
-            # self.log_window.print(f'second, res is {res}')
             client.handle_commands(res)
-            client.print_connected_peers()
 
     def update_available_tracks(self, track_list: List[Track]):
         '''
@@ -162,13 +162,23 @@ class CLI:
             else:
                 self.peer_window.print(peer, curses.color_pair(RED))
 
-    def __del__(self):
+    def cleanup(self):
 
         self.display.keypad(False)
         curses.nocbreak()
         curses.echo()
         curses.endwin()
 
+    def __del__(self):
+
+        self.cleanup()
+
 if (__name__ == '__main__'):
+
+    # Check if port number is specified
+    if len(sys.argv) < 2:
+        print('usage: ./cli.py port')
+        sys.exit()
+
     cli = CLI()
-    cli.run()
+    cli.run(int(sys.argv[1]))

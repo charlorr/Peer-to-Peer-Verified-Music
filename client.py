@@ -1,58 +1,61 @@
 #!/usr/bin/env python3
 
+import atexit
 import socket
 import sys
 
+from peer import Peer
+
 class Client:
+
     def __init__(self, cli):
         self.connections = {}
+        self.cli = cli
         self.log = cli.log_window
 
+        # Make sure the connection list gets stored to disk
+        atexit.register(lambda: Peer.dump_to_disk(self.connections.values()))
+
     # Check if connection is already added and add or remove connection
-    def peer_manipulate(self, host, port, method):
+    def peer_manipulate(self, peer, method):
 
-        already_connected = self.connections.get((host, port), None)
+        if (method == 'remove' and peer not in self.connections):
+            self.log.print(f'Invalid command: not connected to {peer}')
 
-        if (already_connected == None and method == 'remove'):
-            self.log.print(f'Invalid command: not connected to {host}:{port}')
+        # The peer coming in could be a temporary peer to attempt look up the real Peer
+        # The real Peer will actually have the TCP connection if one is open
+        # Otherwise it will indicate that it isn't connected
+        peer = self.connections.get(peer, peer)
 
-        # Check if connections list is accurate
-        if (already_connected != None): # We already have a connection to their server
-            try:
-                already_connected.send('ping isitchristmas.com')
-            except:
-                already_connected = None
-                self.log.print('Updated connected nodes list')
+        # Make sure the connection is actually alive
+        peer.ping()
 
-        # already_connected is now REAL result of whether peer is actually connected
+        # peer.is_connected() is now REAL result of whether peer is actually connected
 
-        if (method == 'remove' and already_connected != None):
-            already_connected.tcp_conn.close()
-            del self.connections[(host, port)]
-            self.log.print(f'removed connection to {host}:{port}')
+        if (method == 'remove'):
+            peer.disconnect()
+            del self.connections[peer]
 
-        elif (method == 'add' and already_connected == None):
-            if (method == 'add'):
-                # Create a new client connection and add to connections list
-                conn = Connection(self.log, host, int(port))
-                if (conn.connected):
-                    self.connections[(host, port)] = conn
+        elif (method == 'add'):
+            if (peer.is_connected()):
+                self.log.print(f'Peer {peer} is already connected')
+            else:
+                # Initiate client connection and add to connections list
+                peer.connect()
+                self.connections[peer] = peer
 
-    def print_connected_peers(self):
-        peers = self.connections.keys()
-        for peer in peers:
-            host, port = peer
-            self.log.print(f'{host}:{port}')
+        self.cli.update_connected_peers(self.connections.values())
 
     def handle_commands(self, command):
-        if (command == 'help'):
+
+        if (command in ['help', '?', '/?', 'h']):
             self.log.print('Available commands:')
 
-            self.log.print('peer add [host]:[port]')
-            self.log.print('peer remove [host]:[port]')
+            self.log.print('  peer add host:port')
+            self.log.print('  peer remove host:port')
 
-            self.log.print('track list')
-            self.log.print('track get [host] [port]')
+            self.log.print('  track list')
+            self.log.print('  track get hash|name')
             return
 
         elif (command == 'exit' or command == 'quit'):
@@ -63,46 +66,36 @@ class Client:
             sys.exit()
 
         tokens = command.split()
+        if (len(tokens) == 0):
+            return
+
         if (tokens[0] == 'peer'):
             if (len(tokens) < 3 or tokens[1] not in ['add', 'remove']):
-                cli.log.print('usage: peer add|remove [host]:[port]')
+                self.log.print('usage: peer add|remove [host]:[port]')
 
             else:
                 host, port = tokens[2].split(':')
-                self.peer_manipulate(host, port, tokens[1])
+                peer = Peer(host, port, log=self.log)
+                self.peer_manipulate(peer, tokens[1])
 
         elif (tokens[0] == 'track'):
-            # TODO
-            self.log.print('todo')
+            if (len(tokens) < 2 or tokens[1] not in ['list', 'get'] or (tokens[1] == 'get' and len(tokens) < 3)):
+                self.log.print('Usage:')
+                self.log.print('  track list')
+                self.log.print('  track get hash|name')
+
+            elif (tokens[1] == 'list'):
+
+                # TODO: Ask servers for any updates?
+                # TODO: Push new file list
+                pass
+
+            elif (tokens[1] == 'get'):
+
+                track_name_or_id = tokens[3]
+                self.log.print(track_name_or_id)
+
+                # TODO: Look at which server has this and start a download
+
         else:
             self.log.print('Invalid command. Type "help" for available commands')
-
-        # self.log.print('connected peers: ')
-
-class Connection:
-    def __init__(self, log, host, port):
-        self.log = log
-        self.host = host
-        self.port = port
-        self.connected = True
-
-        # Initialize a TCP client socket using SOCK_STREAM
-        self.tcp_conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-        try:
-            # Establish connection to TCP server and exchange data
-            self.tcp_conn.connect((self.host, self.port))
-        except ConnectionRefusedError:
-            self.log.print(f'Unable to connect to {host}:{port}')
-            self.connected = False
-            return None # This is what __init__ should return?
-
-        self.log.print(f'Client connected to {host}:{port}')
-
-    def send(self, data):
-
-        self.tcp_conn.sendall(data.encode())
-
-        # Read data from the TCP server and close the connection
-        received = self.tcp_conn.recv(1024)
-        self.log.print(f'Received: {received.decode()}')
