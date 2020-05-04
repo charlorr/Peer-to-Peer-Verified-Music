@@ -74,7 +74,7 @@ class Client:
 
         self.add_tracks(tracks)
 
-        self.cli.update_available_tracks(self.all_tracks.values())
+        self.update_tracks()
         self.cli.log('Done')
 
     def do_track_list_update(self):
@@ -92,7 +92,7 @@ class Client:
 
                 self.add_tracks(tracks)
 
-        self.cli.update_available_tracks(self.all_tracks.values())
+        self.update_tracks()
 
     def restore_peers(self):
         '''
@@ -142,6 +142,9 @@ class Client:
 
         self.update_peers()
         self.do_track_list_update()
+
+    def update_tracks(self):
+        self.cli.update_available_tracks(self.all_tracks.values())
 
     def update_peers(self):
         self.cli.update_connected_peers(self.connections.values())
@@ -198,6 +201,8 @@ class Client:
 
                 track = self.all_tracks_sh[short_hash]
                 track.download(self.cli)
+
+                self.update_tracks()
 
         else:
             self.cli.log('Invalid command. Type "help" for available commands')

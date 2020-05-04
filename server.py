@@ -65,17 +65,49 @@ class ClientThread(threading.Thread):
 
         return base64.b64encode(data).decode()
 
+    def read_message(self):
+        '''
+        Read a full message from a client.
+        '''
+
+        buffer = bytes()
+
+        while True:
+            try:
+                received = self.conn.recv(constant.MAX_SOCK_READ)
+                buffer += received
+            except socket.timeout:
+                self.cli.log('Request timed out')
+                return None
+
+            if (received is None or len(received) == 0):
+                self.conn.close()
+                self.cli.log(f'Connection to {self.peer} closed')
+                return None
+
+            try:
+                last_four = buffer[-4:]
+                last_four = last_four.decode()
+
+                if (last_four == '\r\n\r\n'):
+                    buffer = buffer[:-4]
+                    break
+
+            except Exception as e:
+                self.cli.log(e)
+
+        return buffer
+
     def run(self):
 
         while True:
             try:
-                data = self.conn.recv(constant.MAX_SOCK_READ).decode()
 
-                if (len(data) == 0):
-                    self.conn.close()
-                    self.cli.log(f'Connection to {self.peer} closed')
+                data = self.read_message()
+                if (data is None):
                     break
 
+                data = data.decode()
                 self.cli.log(data)
 
                 str_resp = None
@@ -91,6 +123,7 @@ class ClientThread(threading.Thread):
                 self.cli.log(str_resp)
 
                 self.conn.sendall(str_resp.encode())
+                self.conn.sendall('\r\n\r\n'.encode())
 
             except socket.timeout:
                 self.conn.close()

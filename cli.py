@@ -165,8 +165,6 @@ class CLI:
 
     def cleanup(self):
 
-        # return
-
         self.display.keypad(False)
         curses.nocbreak()
         curses.echo()

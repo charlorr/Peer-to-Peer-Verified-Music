@@ -159,6 +159,7 @@ class Peer:
 
         try:
             self.tcp_conn.sendall(data)
+            self.tcp_conn.sendall('\r\n\r\n'.encode())
             self.cli.log(f'Sent {len(data)} bytes to {self}')
         except:
             self.cli.log('Failed to send data')
@@ -166,7 +167,42 @@ class Peer:
 
         return True
 
-    def recv(self, timeout=5, size=constant.MAX_SOCK_READ, to_str=True, to_json=False):
+    def read_into_buffer(self):
+        '''
+        Read bytes into a buffer until seeing \r\n\r\n.
+        '''
+
+        buffer = bytes()
+
+        while True:
+            try:
+                received = self.tcp_conn.recv(constant.MAX_SOCK_READ)
+                buffer += received
+            except socket.timeout:
+                self.cli.log('Request timed out')
+                return None
+
+            if (received is None or len(received) == 0):
+                self.cli.log(f'Connection to {self} closed')
+                self.disconnect()
+                return None
+
+            try:
+                last_four = buffer[-4:]
+                last_four = last_four.decode()
+
+                if (last_four == '\r\n\r\n'):
+                    buffer = buffer[:-4]
+                    break
+
+            except Exception as e:
+                self.cli.log(e)
+
+        self.cli.log(f'Buffered {len(buffer)} bytes')
+
+        return buffer
+
+    def recv(self, timeout=5, to_str=True, to_json=False):
         '''
         Read from the socket. Returns `None` if response does
         not arrive before `timeout`.
@@ -174,15 +210,8 @@ class Peer:
 
         self.tcp_conn.settimeout(timeout)
 
-        try:
-            resp = self.tcp_conn.recv(size)
-        except socket.timeout:
-            self.cli.log('Request timed out')
-            return None
-
-        if (resp is None or len(resp) == 0):
-            self.cli.log(f'Connection to {self} closed')
-            self.disconnect()
+        resp = self.read_into_buffer()
+        if (resp is None):
             return None
 
         if (to_str or to_json):
