@@ -108,7 +108,7 @@ class ClientThread(threading.Thread):
                     break
 
                 data = data.decode()
-                self.cli.log(data)
+                # self.cli.log(data)
 
                 str_resp = None
 
@@ -120,7 +120,7 @@ class ClientThread(threading.Thread):
                     if (str_resp is None):
                         continue
 
-                self.cli.log(str_resp)
+                # self.cli.log(str_resp)
 
                 self.conn.sendall(str_resp.encode())
                 self.conn.sendall('\r\n\r\n'.encode())

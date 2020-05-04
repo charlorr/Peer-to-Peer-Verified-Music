@@ -1,4 +1,5 @@
 import hashlib
+import filetype
 import json
 import os.path
 
@@ -15,6 +16,7 @@ class Track:
         '''
 
         path = os.path.join(constant.FILE_PREFIX, file_name)
+        extension = filetype.guess_extension(path)
 
         duration, fingerprint = aid.fingerprint_file(path)
         file_hash = hash_file(path)
@@ -30,7 +32,7 @@ class Track:
             title = 'Track ' + file_hash[:constant.HASH_LEN]
             artist = 'Unknown'
 
-        return Track(title, artist, duration, file_hash, fingerprint, path=file_name, local=True)
+        return Track(title, artist, duration, file_hash, fingerprint, extension, path=file_name, local=True)
 
     @staticmethod
     def from_json(json_str: str, peer):
@@ -53,8 +55,9 @@ class Track:
         file_hash = json_dict['hash']
         title = json_dict['title']
         artist = json_dict['artist']
+        extension = json_dict['ext']
 
-        return Track(title, artist, duration, file_hash, fingerprint, peer=peer, local=False)
+        return Track(title, artist, duration, file_hash, fingerprint, extension, peer=peer, local=False)
 
     def __init__(self,
         title: str,
@@ -62,6 +65,7 @@ class Track:
         duration_s: float,
         file_hash: str,
         fingerprint: bytes,
+        extension: str,
         path: str = None,
         peer = None,
         local: bool = False
@@ -72,6 +76,7 @@ class Track:
         self.duration = duration_s
         self.hash = file_hash
         self.fingerprint = fingerprint
+        self.extension = extension
         self.path = path
         self.peer = peer
         self.local = local
@@ -99,7 +104,8 @@ class Track:
             'artist': self.artist,
             'duration': self.duration,
             'hash': self.hash,
-            'fingerprint': '' # self.fingerprint # Trouble sending this because it's bytes
+            'fingerprint': '', # self.fingerprint # Trouble sending this because it's bytes
+            'ext': self.extension
         }
 
         return json_dict

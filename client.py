@@ -64,7 +64,7 @@ class Client:
         # Create a bogus track to fix the issue
         # where the screen clears itself
         # This trigger the delayed import of CLI
-        t = Track('', '', 0, '', b'')
+        t = Track('', '', 0, '', b'', '')
 
         self.cli.log(f"Checking directory '{constant.FILE_PREFIX}' for media... ")
 
@@ -139,13 +139,15 @@ class Client:
                 self.cli.log(f'Peer {peer} is already connected')
             else:
                 # Initiate client connection and add to connections list
-                peer.connect()
+                success = peer.connect()
                 self.connections[peer] = peer
 
-                # Get the new tracks
-                tracks = peer.request_track_list()
-                if (tracks is not None):
-                    self.add_tracks(tracks)
+                if (success):
+
+                    # Get the new tracks
+                    tracks = peer.request_track_list()
+                    if (tracks is not None):
+                        self.add_tracks(tracks)
 
         self.update_peers()
 

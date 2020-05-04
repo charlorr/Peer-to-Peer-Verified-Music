@@ -129,20 +129,27 @@ class Peer:
 
         b64_data = json_dict['fileData']
 
-        file_path = os.path.join(constant.FILE_PREFIX, track.hash)
+        file_name = f'{track.hash}.{track.extension}'
+        file_path = os.path.join(constant.FILE_PREFIX, file_name)
         file_data = base64.b64decode(b64_data)
 
         with open(file_path, 'wb') as f:
             f.write(file_data)
 
+        self.cli.log(f'Wrote {file_name}')
+
         final_hash = hash_file(file_path)
 
         if (track.hash != final_hash):
             self.cli.log('Track hashes did not match! File may have been corrupted')
+        else:
+            self.cli.log('File hashes match')
 
         # Mark the file as local
         track.local = True
-        track.path = track.hash
+        track.path = file_name
+
+        self.cli.log('Download successful')
 
         return True
 
