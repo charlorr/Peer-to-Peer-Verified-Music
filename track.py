@@ -27,10 +27,10 @@ class Track:
             # Ignore score and recording_id
             _, _, title, artist = next(matches)
         except StopIteration:
-            title = 'Track ' + file_hash[:6]
+            title = 'Track ' + file_hash[:constant.HASH_LEN]
             artist = 'Unknown'
 
-        return Track(title, artist, duration, file_hash, fingerprint, local=True)
+        return Track(title, artist, duration, file_hash, fingerprint, path=file_name, local=True)
 
     @staticmethod
     def from_json(json_str: str):
@@ -46,7 +46,7 @@ class Track:
         title = json_dict['title']
         artist = json_dict['artist']
 
-        return Track(title, artist, duration, file_hash, fingerprint, local=False)
+        return Track(title, artist, duration, file_hash, fingerprint, path=None, local=False)
 
     def __init__(self,
         title: str,
@@ -62,6 +62,7 @@ class Track:
         self.duration = duration_s
         self.hash = file_hash
         self.fingerprint = fingerprint
+        self.path = path
         self.local = local
 
     def to_json(self):
@@ -78,7 +79,7 @@ class Track:
 
     def __str__(self):
 
-        return f'{self.title} -- {self.artist}'
+        return f'[{self.hash[:constant.HASH_LEN]}] {self.title} -- {self.artist}'
 
 def hash_file(path: str) -> str:
     '''

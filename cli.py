@@ -32,7 +32,7 @@ class CursesBox:
         self.container.box()
 
         if (title is not None):
-            self.container.addstr(0, 1, title, curses.A_BOLD + curses.color_pair(RED))
+            self.container.addstr(0, 1, title, curses.A_BOLD)
 
         self.container.refresh()
 

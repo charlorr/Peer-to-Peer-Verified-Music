@@ -9,3 +9,4 @@ PROG_NAME = 'Peer-to-Peer Verified Music'
 API_KEY = secrets["API_KEY"]
 FILE_PREFIX = 'content'
 MAX_CHARS = 100
+HASH_LEN = 4
