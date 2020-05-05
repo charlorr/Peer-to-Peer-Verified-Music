@@ -1,9 +1,12 @@
 # Peer-to-Peer-Verified-Music #
-Peer-to-Peer file sharing platform that uses Acoustic Fingerprinting to verify the content of music files 
+Peer-to-Peer file sharing platform that uses Acoustic Fingerprinting to verify the content of music files
 
 ## Installation
 
-For easy setup, run `./setup.sh`
+For easy setup, run
+```
+./setup.sh
+```
 
 Python 3.6+ is required.
 
@@ -13,9 +16,9 @@ To start the program, run
 ```
 python3 ./cli.py PORT
 ```
-The folder used as the source of local content for this node is the default: `./content/`
+The folder used as the source of local content for a node started this way is the default: `./content/`
 
-Alternately, for a custom path to the folder that is used as the source of local content:
+Alternately, for a custom path to the folder that is used as the source of local content, run
 ```
 python3 ./cli.py PORT CONTENT_PATH
 ```
@@ -43,10 +46,10 @@ The top-right box shows the added peer nodes. If the current node has establishe
 **Status:**
 The bottom box shows the status of the node, including output detailing recently executed commands and commands executed on it by peers.
 
-On startup, in addition to attempting to connect to peers in `config.json`, all files available for download in each node's content folder on the network are listed in the Available Tracks window. Each track's file contents is hashed using acoustic fingerprinting. The hashes are searched for matches in the acoustic fingerprint database [Acoustid](https://acoustid.org/). If a match is found to a song in the database, the track is named in the format
+On startup, in addition to attempting to connect to peers in `config.json`, all files available for download in each node's content folder on the network are listed in the **Available Tracks** window. Each track's file contents is hashed using acoustic fingerprinting. The hashes are searched for matches in the acoustic fingerprint database [Acoustid](https://acoustid.org/). If a match is found to a song in the database, the track is named in the format
 `[hash] Track Title -- Artist Name`. The format `[hash] Track hash -- Unknown` is used if a match is not found.
 
-A complete description of the expected behavior and design of **Peer-to-Peer Verified Music** is available in the last section of `Report.pdf`.
+A complete description of the expected behavior and design of Peer-to-Peer Verified Music is available in the last section of `Report.pdf`.
 
 ## Commands
 
@@ -54,7 +57,7 @@ A complete description of the expected behavior and design of **Peer-to-Peer Ver
 
 `exit`: Closes all connections with node and exits
 
-`peer add HOST:PORT`: Adds node hosted at `host:port` to connections that will be saved in `config.json`. If a connection is failed, the `host:port` will be shown in the **Peers** window in red
+`peer add HOST:PORT`: Adds node hosted at `host:port` to connections that will be saved in `config.json`. If a connection is failed, the `host:port` will be shown in the **Peers** window in red.
 
 `peer remove HOST:PORT`: Removes node hosted at `host:port` from connections
 
