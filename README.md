@@ -1,5 +1,5 @@
 # Peer-to-Peer-Verified-Music #
-Peer-to-Peer file sharing system that verifies the content of music files
+Peer-to-Peer file sharing platform that uses Acoustic Fingerprinting to verify the content of music files 
 
 ## Installation
 
